@@ -1,0 +1,253 @@
+/*
+ * Publish Code: HMT4E
+ */
+
+import "customGameSettings.json";
+
+define VIEW_ANGLE: 50.0;
+define HIDE_RADIUS: 17.0;
+define MOVE_SPEED: 300;
+
+globalvar define sym_locations = [
+    Vector(-2.99, 8.30, 55.18),
+    Vector(-8.78, 8.64, 35.69),
+    Vector(-10.57, 13.30, 7.35),
+    Vector(-19.20, 13.30, -7.67),
+    Vector(-29.12, 10.30, -2.01),
+    Vector(26.55, 4.30, 3.63),
+    Vector(26.41, 4.30, -3.59),
+    Vector(22.73, 7.32, -15.68),
+    Vector(-0.50, 8.68, -27.20),
+    Vector(-9.58, 8.30, -42.14)
+];
+globalvar define current_sym = null;
+
+define BOT_FACING: Vector(1,0,0);
+
+define TARGET_COUNT_MAX: 5;
+globalvar define target_count = TARGET_COUNT_MAX;
+globalvar define need_new_target = true;
+
+playervar define blink = false;
+define MAX_BLINK_TIME: 700;
+playervar define blink_time = 0;
+define MAX_BLINK_STAMINA_MIN: 8000;
+define MAX_BLINK_STAMINA_VARIANCE: 4000;
+playervar define blink_stamina = MAX_BLINK_STAMINA_MIN;
+playervar define max_blink_stamina = MAX_BLINK_STAMINA_MIN;
+playervar define sym_distance = 0;
+
+define MAX_SYM_FIRE_HOLD: 1000;
+playervar define sym_fire_hold = MAX_SYM_FIRE_HOLD;
+
+
+rule: "General Player"
+Event.OngoingPlayer
+{
+    DisableNameplates(AllPlayers(), AllPlayers());
+}
+
+rule: "Make bot player"
+if (IsWaitingForPlayers()) {
+    DestroyAllDummyBots();
+    if (WorkshopSettingToggle("Soldier 73", "Bot 73", false)) {
+        CreateDummyBot(Hero.Reaper, Team.Team2, 0);
+    }
+    if (WorkshopSettingToggle("Soldier 73", "Bot Mei", false)) {
+        CreateDummyBot(Hero.Mei, Team.Team1, 6);
+    }
+    StartFacing(FilteredArray(AllPlayers(), IsDummyBot(ArrayElement())), BOT_FACING, 25, Relative.ToPlayer, FacingRev.DirectionAndTurnRate);
+}
+
+rule: "main assemble"
+if (IsAssemblingHeroes())
+{
+    target_count = WorkshopSettingInteger("Soldier 73", "Target Count", 5, 1, 10);
+    SetMatchTime(10);
+}
+
+rule: "main"
+if (IsGameInProgress())
+{
+    SetMatchTime(600);
+    CreateHudText(
+        VisibleTo: AllPlayers(Team.Team1),
+        Header: <"Defeat <0> Target<1>", target_count, target_count == 1 ? "" : "s">,
+        HeaderColor: Color.Team1,
+        Location: Location.Left,
+        Reevaluation: HudTextRev.VisibleToAndString,
+        SortOrder: 1
+    );
+}
+
+rule: "Mei init"
+Event.OngoingPlayer
+if (EventPlayer().Team() == Team.Team1)
+{
+    SetAllowedHeroes(EventPlayer(), Hero.Mei);
+    StartForcingPlayerOutlines(AllPlayers(), EventPlayer(), false);
+
+    ChaseVariableAtRate(
+        sym_distance,
+        current_sym == null ? 0
+            : (Max(0, 70 - DistanceBetween(EventPlayer(), current_sym)) +
+              (180 - AbsoluteValue(HorizontalAngleTowards(EventPlayer(), PositionOf(current_sym)))) / 6),
+        10,
+        RateChaseReevaluation.DestinationAndRate
+    );
+    CreateHudText(
+        VisibleTo: EventPlayer(),
+        Text: " \n \n \n \n",
+        SortOrder: 2,
+        Location: Location.Top
+    );
+    CreateProgressBarHudText(
+        VisibleTo: EventPlayer(),
+        Value: sym_distance,
+        Text: "Target Detector",
+        SortOrder: 5,
+        Location: Location.Top,
+        ProgressBarColor: Color.Team2,
+        Reevaluation: ProgressBarHudEvaluation.Values
+    );
+    CreateProgressBarHudText(
+        VisibleTo: EventPlayer(),
+        Value: (100 * blink_stamina) / max_blink_stamina,
+        Text: "Blink",
+        SortOrder: 5,
+        Location: Location.Top,
+        ProgressBarColor: Color.Team1,
+        Reevaluation: ProgressBarHudEvaluation.Values
+    );
+    ChaseVariableAtRate(blink_stamina, 0, 1000, RateChaseReevaluation.None);
+    ChaseVariableAtRate(blink_time, 0, 1000, RateChaseReevaluation.None);
+}
+
+rule: "Mei blink"
+Event.OngoingPlayer
+if (EventPlayer().Team() == Team.Team1)
+if (EventPlayer().blink == false)
+if (EventPlayer().IsButtonHeld(Button.Interact) || EventPlayer().blink_stamina <= 0)
+{
+    StartCamera(EventPlayer(), Vector(0, -100, 0), Vector(0, -101, 0), 0);
+    blink_time = MAX_BLINK_TIME;
+    blink = true;
+}
+
+rule: "Mei blink end"
+Event.OngoingPlayer
+if (EventPlayer().Team() == Team.Team1)
+if (EventPlayer().blink == true)
+if (EventPlayer().blink_time <= 0)
+{
+    StopCamera(EventPlayer());
+    max_blink_stamina = MAX_BLINK_STAMINA_MIN + RandomInteger(0, MAX_BLINK_STAMINA_VARIANCE);
+    blink_stamina = max_blink_stamina;
+    blink = false;
+}
+
+rule: "Beeper init"
+Event.OngoingPlayer
+if (EventPlayer().Team() == Team.Team2)
+{
+    SetAllowedHeroes(AllPlayers(Team.Team2), Hero.Reaper);
+}
+
+rule: "Beeper init"
+Event.OngoingPlayer
+if (EventPlayer().Team() == Team.Team2)
+if (EventPlayer().Hero() == Hero.Reaper)
+{
+    SetJumpEnabled(EventPlayer(), false);
+    StartForcingPlayerOutlines(AllPlayers(), EventPlayer(), true, Color.Team1, OutlineType.Always);
+    SetStatus(EventPlayer(), null, Status.Invincible, 9999);
+    SetMoveSpeed(EventPlayer(), MOVE_SPEED);
+    SetPrimaryFireEnabled(EventPlayer(), false);
+    SetDamageDealt(EventPlayer(), 10000);
+}
+
+define CAN_SEE(define e, define p): (!e.blink && IsInLineOfSight(e, p, BarrierLOS.AllBarriersBlock) && IsInViewAngle(e, p, VIEW_ANGLE));
+
+rule: "Beeper seen"
+Event.OngoingPlayer
+if (EventPlayer().Team() == Team.Team2)
+if (IsTrueForAny(AllLivingPlayers(Team.Team1), CAN_SEE(ArrayElement(), EventPlayer())))
+if (EventPlayer().Hero() == Hero.Reaper)
+{
+    SetInvisible(EventPlayer(), InvisibleTo.None);
+    SetMoveSpeed(EventPlayer(), 0);
+    define facing = FacingDirectionOf(EventPlayer());
+    StartFacing(EventPlayer(), facing, 99999, Relative.ToWorld, FacingRev.None);
+    SetMeleeEnabled(EventPlayer(), false);
+    SetCrouchEnabled(EventPlayer(), false);
+}
+
+rule: "Beeper not seen"
+Event.OngoingPlayer
+if (EventPlayer().Team() == Team.Team2)
+if (!(IsTrueForAny(AllLivingPlayers(Team.Team1), CAN_SEE(ArrayElement(), EventPlayer()))))
+if (EventPlayer().Hero() == Hero.Reaper)
+{
+    SetInvisible(EventPlayer(), InvisibleTo.All);
+    SetMoveSpeed(EventPlayer(), MOVE_SPEED);
+    StopFacing(EventPlayer());
+    SetMeleeEnabled(EventPlayer(), true);
+    SetCrouchEnabled(EventPlayer(), true);
+}
+
+rule: "Create new target"
+if (IsGameInProgress())
+if (need_new_target)
+{
+    need_new_target = false;
+    CreateDummyBot(Hero.Symmetra, Team.Team2, (TARGET_COUNT_MAX - target_count) + 1, RandomValueInArray(sym_locations));
+}
+
+rule: "Symmetra Killed"
+Event.OnDeath
+if (EventPlayer().Hero() == Hero.Symmetra)
+{
+    current_sym = null;
+    target_count -= 1;
+    if (target_count == 0) {
+        DeclareTeamVictory(Team.Team1);
+    }
+    WaitAsync(3, () => need_new_target = true);
+}
+
+rule: "Symmetra Init"
+Event.OngoingPlayer
+if (EventPlayer().Hero() == Hero.Symmetra)
+{
+    current_sym = EventPlayer();
+    SetDamageDealt(EventPlayer(), 50);
+    StartFacing(EventPlayer(), DirectionTowards(EventPlayer(), ClosestPlayerTo(EventPlayer(), Team.Team1)), 150, Relative.ToWorld, FacingRev.DirectionAndTurnRate);
+    ChaseVariableAtRate(sym_fire_hold, 0, 1000, RateChaseReevaluation.None);
+}
+
+rule: "Symmetra Target Out of LOS"
+Event.OngoingPlayer
+if (EventPlayer().Hero() == Hero.Symmetra)
+if (!IsInLineOfSight(EventPlayer(), ClosestPlayerTo(EventPlayer(), Team.Team1)))
+{
+    StopHoldingButton(EventPlayer(), Button.SecondaryFire);
+}
+
+rule: "Symmetra Target in LOS Start"
+Event.OngoingPlayer
+if (EventPlayer().Hero() == Hero.Symmetra)
+if (IsInLineOfSight(EventPlayer(), ClosestPlayerTo(EventPlayer(), Team.Team1)))
+if (sym_fire_hold > 0)
+{
+    StartHoldingButton(EventPlayer(), Button.SecondaryFire);
+}
+
+rule: "Symmetra Target In LOS End"
+Event.OngoingPlayer
+if (EventPlayer().Hero() == Hero.Symmetra)
+if (IsInLineOfSight(EventPlayer(), ClosestPlayerTo(EventPlayer(), Team.Team1)))
+if (sym_fire_hold <= 0)
+{
+    StopHoldingButton(EventPlayer(), Button.SecondaryFire);
+    sym_fire_hold = MAX_SYM_FIRE_HOLD;
+}

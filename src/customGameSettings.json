@@ -1,0 +1,60 @@
+{
+    "Mode Name": "Soldier: 73",
+    "Heroes": {
+        "General": {
+            "Enabled Heroes": [
+                "Mei"
+            ],
+            "General": {
+                "Ultimate Generation - Passive": 0,
+                "Ultimate Generation - Combat": 0
+            },
+            "Cassidy": {
+                "Combat Roll Cooldown Time": 2,
+                "Magnetic Grenade": false
+            },
+            "Mei": {
+                "Cryo-Freeze": false,
+                "Ultimate Ability (Blizzard)": false
+            },
+            "Reaper": {
+                "Primary Fire": false,
+                "Wraith Form": false,
+                "Shadow Step": false,
+                "Ultimate Ability (Death Blossom)": false
+            },
+            "Reinhardt": {
+                "Projectile Speed": 200,
+                "Rocket Hammer Knockback Scalar": 0
+            },
+            "Brigitte": {
+            }
+        }
+    },
+    "Modes": {
+        "All": {
+            "Game Mode Start": "Immediately",
+            "Hero Limit": "Off",
+            "Respawn Time Scalar": 5,
+            "Spawn Health Packs": "Enabled",
+            "Health Pack Respawn Time Scalar": 500
+        },
+        "Elimination": {
+            "Score To Win": 1,
+            "Enabled": true,
+            "Enabled Maps": [
+                "Ecopoint: Antarctica (Winter)"
+            ]
+        }
+    },
+    "Lobby": {
+        "Max Team 1 Players": 5,
+        "Max Team 2 Players": 1,
+        "Match Voice Chat": true,
+        "Pause Game On Player Disconnect": true,
+        "Allow Players Who Are In Queue": true,
+        "Return To Lobby": "After A Game",
+        "Swap Teams After Match": false
+    },
+    "Description": "by depth1stsearch"
+}
